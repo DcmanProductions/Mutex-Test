@@ -5,7 +5,7 @@ internal class Program
 {
     private static void Main(string[] args)
     {
-        string pipeName = "MyNamedPipe";
+        string pipeName = "MyNamedPipe"; // This lets the client know which pipe to connect to.
         _ = new Mutex(true, "MutexTest", out bool createdNew); // Checks if an instance is already created.
         if (!createdNew)
         {
@@ -25,40 +25,42 @@ internal class Program
 
     private static void SendArgumentsToExistingInstance(string pipeName, string[] args)
     {
-        using NamedPipeClientStream clientPipe = new(".", pipeName, PipeDirection.Out);
+        using NamedPipeClientStream clientPipe = new(".", pipeName, PipeDirection.Out); // a client pipe stream is used to send messages.
         try
         {
-            clientPipe.Connect();
-            using StreamWriter writer = new(clientPipe);
-            writer.Write(string.Join(" ", args));
-            writer.Flush();
+            clientPipe.Connect(); // attempts to connect to the server.
+            using StreamWriter writer = new(clientPipe); // a stream writer is used to write messages to the server.
+            writer.Write(string.Join(" ", args)); // join the arguments into a single string and send it to the server.
+            writer.Flush(); // flush the stream writer to send the message.
         }
         catch (Exception ex)
         {
-            Console.WriteLine("Error sending arguments to existing instance: " + ex.Message);
+            Console.WriteLine("Error sending arguments to existing instance: " + ex.Message); // shit when wrong!?!?!?!
         }
     }
 
     private static void StartNamedPipeServer(string pipeName)
     {
-        Task.Run(() =>
+        Task.Run(() => // Creates a new thread to not lock the main thread.
         {
-            while (true)
+            while (true) // Creating an infinite loop to keep the server alive.
             {
                 Console.WriteLine("Waiting for arguments!");
-                using NamedPipeServerStream serverPipe = new(pipeName, PipeDirection.In);
+                using NamedPipeServerStream serverPipe = new(pipeName, PipeDirection.In); // a server pipe stream is used to receive messages.
                 try
                 {
-                    serverPipe.WaitForConnection();
+                    serverPipe.WaitForConnection(); // this method blocks the thread until a client connects.
                     using (StreamReader reader = new(serverPipe))
                     {
-                        string receivedArgs = reader.ReadToEnd();
+                        string receivedArgs = reader.ReadToEnd(); // read the message from the client.
                         Console.WriteLine($"Received arguments: {receivedArgs}");
                     }
-                    serverPipe.Disconnect();
+                    serverPipe.Disconnect(); // disconnect the client once the message is received.
                 }
                 catch
                 {
+                    // This always throws an exception when receiving a message. I don't know why.
+                    // Ignore this exception.
                 }
             }
         });
