@@ -6,8 +6,8 @@ internal class Program
     private static void Main(string[] args)
     {
         string pipeName = "MyNamedPipe";
-
-        if (args.Length > 0)
+        _ = new Mutex(true, "MutexTest", out bool createdNew); // Checks if an instance is already created.
+        if (!createdNew)
         {
             // Send arguments to the existing instance.
             SendArgumentsToExistingInstance(pipeName, args);
@@ -25,37 +25,35 @@ internal class Program
 
     private static void SendArgumentsToExistingInstance(string pipeName, string[] args)
     {
-        using (NamedPipeClientStream clientPipe = new NamedPipeClientStream(".", pipeName, PipeDirection.Out))
+        using NamedPipeClientStream clientPipe = new(".", pipeName, PipeDirection.Out);
+        try
         {
-            try
-            {
-                clientPipe.Connect();
-                using (StreamWriter writer = new StreamWriter(clientPipe))
-                {
-                    writer.Write(string.Join(" ", args));
-                    writer.Flush();
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Error sending arguments to existing instance: " + ex.Message);
-            }
+            clientPipe.Connect();
+            using StreamWriter writer = new(clientPipe);
+            writer.Write(string.Join(" ", args));
+            writer.Flush();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Error sending arguments to existing instance: " + ex.Message);
         }
     }
 
     private static void StartNamedPipeServer(string pipeName)
     {
-        while (true)
+        Task.Run(() =>
         {
-            using (NamedPipeServerStream serverPipe = new NamedPipeServerStream(pipeName, PipeDirection.In))
+            while (true)
             {
+                Console.WriteLine("Waiting for arguments!");
+                using NamedPipeServerStream serverPipe = new(pipeName, PipeDirection.In);
                 try
                 {
                     serverPipe.WaitForConnection();
-                    using (StreamReader reader = new StreamReader(serverPipe))
+                    using (StreamReader reader = new(serverPipe))
                     {
                         string receivedArgs = reader.ReadToEnd();
-                        Console.WriteLine("Received arguments: " + receivedArgs);
+                        Console.WriteLine($"Received arguments: {receivedArgs}");
                     }
                     serverPipe.Disconnect();
                 }
@@ -63,6 +61,6 @@ internal class Program
                 {
                 }
             }
-        }
+        });
     }
 }
